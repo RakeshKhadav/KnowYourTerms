@@ -1,47 +1,45 @@
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../../utils/firebase';
-import { Link, useNavigate } from 'react-router-dom';
-import Input from '../../components/common/Input';
-import Button from '../../components/common/Button';
-import { registerAsync } from '../../store/authSlice';
-import { useAppDispatch } from '../../hooks/redux';
-import { toast } from 'react-toastify';
-import signup from "../../assets/signup.svg"
+import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import Input from "../../components/common/Input";
+import Button from "../../components/common/Button";
+import { registerAsync } from "../../store/authSlice";
+import { useAppDispatch } from "../../hooks/redux";
+import signup from "../../assets/signup.svg";
 
 const Register: React.FC = () => {
- 
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    language: '',
-    region: '',
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    language: "en",
+    region: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-
+    if (formData.password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters.";
+    }
     if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = t('register.password_mismatch');
+      newErrors.confirmPassword = t("register.password_mismatch");
     }
 
     setErrors(newErrors);
@@ -51,44 +49,26 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
+
     setLoading(true);
     setErrors({});
-    try {
-      await createUserWithEmailAndPassword(auth, formData.email, formData.password);
 
-      // Call backend API to create Firestore user profile via authService
-      try {
-        const result = await dispatch(registerAsync({
+    try {
+      await dispatch(
+        registerAsync({
           email: formData.email,
+          password: formData.password,
           displayName: formData.name,
           region: formData.region,
           language: formData.language,
-        })).unwrap();
-        // console.log("Registration result:", result); // Debug log
-        
-        if (result.user) {
-          toast.success("Account created successfully!");
-          setLoading(false);
-          navigate("/login");
-        } else {
-          toast.error("Failed to create account.");
-        }
-      } catch (apiError: any) {
-        toast.error(apiError.message || "Failed to create account.");
-        setLoading(false);
-        return;
-      }
+        }),
+      ).unwrap();
 
+      toast.success("Account created successfully!");
+      navigate("/dashboard");
     } catch (error: any) {
-      let message = 'Registration failed. Please try again.';
-      if (error.code === 'auth/email-already-in-use') {
-        message = 'Email is already in use.';
-      } else if (error.code === 'auth/invalid-email') {
-        message = 'Invalid email address.';
-      } else if (error.code === 'auth/weak-password') {
-        message = 'Password should be at least 6 characters.';
-      }
-      setErrors({ general: message });
+      setErrors({ general: error || "Registration failed. Please try again." });
+      toast.error(error || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -97,27 +77,26 @@ const Register: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f5f7fa]">
       <div className="flex w-full max-w-4xl shadow-2xl rounded-2xl overflow-hidden border border-[#e0e3ef] bg-white">
-        {/* Left: Illustration/Brand */}
         <div className="hidden md:flex flex-col justify-center items-center w-1/2 bg-[#e5e7eb] p-10">
           <img src="/logo.png" alt="Know Your Terms Logo" className="h-36 w-36 object-contain mb-6" />
-          <h2 className="text-3xl font-bold text-black mb-2 text-center">{t('register.title')}</h2>
-          <p className="text-lg text-gray-700 text-center max-w-xs">{t('register.subtitle')}</p>
+          <h2 className="text-3xl font-bold text-black mb-2 text-center">{t("register.title")}</h2>
+          <p className="text-lg text-gray-700 text-center max-w-xs">{t("register.subtitle")}</p>
           <img src={signup} alt="Legal Illustration" className="mt-8 w-40" />
         </div>
-        {/* Right: Register Form */}
         <div className="w-full md:w-1/2 bg-[#f9fafb] p-8 md:p-6 flex flex-col justify-center border-l border-[#e0e3ef]">
           <div className="flex flex-col items-center mb-6">
-            <img src="https://www.svgrepo.com/show/499964/law-legal-justice-10.svg" alt="Legal Platform Logo" className="h-14 w-14 object-contain md:hidden mb-4" />
-            <h2 className="text-2xl md:text-3xl font-bold text-black mb-2">{t('register.title')}</h2>
-            <p className="text-gray-700 text-sm">{t('register.subtitle')}</p>
+            <img
+              src="https://www.svgrepo.com/show/499964/law-legal-justice-10.svg"
+              alt="Legal Platform Logo"
+              className="h-14 w-14 object-contain md:hidden mb-4"
+            />
+            <h2 className="text-2xl md:text-3xl font-bold text-black mb-2">{t("register.title")}</h2>
+            <p className="text-gray-700 text-sm">{t("register.subtitle")}</p>
           </div>
           <form className="space-y-6" onSubmit={handleSubmit}>
             {errors.general && (
               <div className="bg-[#e8eaf6] border-l-4 border-[#1a237e] text-[#1a237e] px-4 py-3 rounded-lg text-sm shadow-sm mb-2">
-                <div className="flex items-center">
-                  <span className="mr-2">⚠️</span>
-                  {errors.general}
-                </div>
+                {errors.general}
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -143,62 +122,31 @@ const Register: React.FC = () => {
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-black mb-1">
-                Language
-              </label>
-              <select
-                id="language"
-                name="language"
-                value={formData.language}
-                onChange={handleInputChange}
-                className="block w-full px-3 py-2.5 bg-white border border-[#e6e1d5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#CDA047] focus:border-[#CDA047] text-sm transition-colors"
-              >
-                <option value="en">English</option>
-                <option value="hi">Hindi (हिन्दी)</option>
-                <option value="bn">Bengali (বাংলা)</option>
-                <option value="te">Telugu (తెలుగు)</option>
-                <option value="mr">Marathi (मराठी)</option>
-                <option value="ta">Tamil (தமிழ்)</option>
-                <option value="ur">Urdu (اردو)</option>
-                <option value="gu">Gujarati (ગુજરાતી)</option>
-                <option value="kn">Kannada (ಕನ್ನಡ)</option>
-                <option value="ml">Malayalam (മലയാളം)</option>
-                <option value="or">Odia (ଓଡ଼ିଆ)</option>
-                <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
-                <option value="as">Assamese (অসমীয়া)</option>
-                <option value="ma">Maithili (मैथिली)</option>
-                <option value="sa">Sanskrit (संस्कृतम्)</option>
-                <option value="sd">Sindhi (سنڌي)</option>
-                <option value="ks">Kashmiri (کٲشُر)</option>
-                <option value="ne">Nepali (नेपाली)</option>
-                <option value="bho">Bhojpuri (भोजपुरी)</option>
-                <option value="ta">Santali (ᱥᱟᱱᱛᱟᱲᱤ)</option>
-                <option value="dog">Dogri (डोगरी)</option>
-                <option value="mni">Manipuri (মৈতৈলোন্)</option>
-                <option value="kok">Konkani (कोंकणी)</option>
-                <option value="doi">Dogri (डोगरी)</option>
-                <option value="brj">Braj (ब्रज भाषा)</option>
-                <option value="raj">Rajasthani (राजस्थानी)</option>
-                <option value="bh">Bihari (बिहारी)</option>
-                <option value="ch">Chhattisgarhi (छत्तीसगढ़ी)</option>
-                <option value="mag">Magahi (मगही)</option>
-                <option value="awa">Awadhi (अवधी)</option>
-                <option value="gom">Goan Konkani (कोंकणी)</option>
-                <option value="lep">Lepcha (ᰛᰩᰵᰛᰧᰵ)</option>
-                <option value="mtr">Mundari (ᱢᱩᱱᱫᱟᱨᱤ)</option>
-                <option value="ho">Ho (ᱦᱚ)</option>
-                <option value="sat">Santal (ᱥᱟᱱᱛᱟᱲᱤ)</option>
-                <option value="khn">Khasi (Ka Khasi)</option>
-                <option value="grt">Garo (A·chik)</option>
-                <option value="lus">Mizo (Mizo tawng)</option>
-                <option value="njz">Naga (Naga languages)</option>
-                <option value="en-IN">Other (Other Indian Language)</option>
-              </select>
-              <p className="mt-1 text-xs text-black/70">
-                Select your Language
-              </p>
-            </div>
+              <div>
+                <label htmlFor="language" className="block text-sm font-medium text-black mb-1">
+                  Language
+                </label>
+                <select
+                  id="language"
+                  name="language"
+                  value={formData.language}
+                  onChange={handleInputChange}
+                  className="block w-full px-3 py-2.5 bg-white border border-[#e6e1d5] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#CDA047] focus:border-[#CDA047] text-sm transition-colors"
+                >
+                  <option value="en">English</option>
+                  <option value="hi">Hindi (हिन्दी)</option>
+                  <option value="bn">Bengali (বাংলা)</option>
+                  <option value="te">Telugu (తెలుగు)</option>
+                  <option value="mr">Marathi (मराठी)</option>
+                  <option value="ta">Tamil (தமிழ்)</option>
+                  <option value="gu">Gujarati (ગુજરાતી)</option>
+                  <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                  <option value="ml">Malayalam (മലയാളം)</option>
+                  <option value="or">Odia (ଓଡ଼ିଆ)</option>
+                  <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+                  <option value="as">Assamese (অসমীয়া)</option>
+                </select>
+              </div>
               <div>
                 <label htmlFor="region" className="block text-sm font-medium text-black mb-1">
                   Region/State
@@ -225,23 +173,15 @@ const Register: React.FC = () => {
                   <option value="kerala">Kerala</option>
                   <option value="madhya-pradesh">Madhya Pradesh</option>
                   <option value="maharashtra">Maharashtra</option>
-                  <option value="manipur">Manipur</option>
-                  <option value="meghalaya">Meghalaya</option>
-                  <option value="mizoram">Mizoram</option>
-                  <option value="nagaland">Nagaland</option>
                   <option value="odisha">Odisha</option>
                   <option value="punjab">Punjab</option>
                   <option value="rajasthan">Rajasthan</option>
-                  <option value="sikkim">Sikkim</option>
                   <option value="tamil-nadu">Tamil Nadu</option>
                   <option value="telangana">Telangana</option>
-                  <option value="tripura">Tripura</option>
                   <option value="uttar-pradesh">Uttar Pradesh</option>
                   <option value="uttarakhand">Uttarakhand</option>
                   <option value="west-bengal">West Bengal</option>
                   <option value="delhi">Delhi</option>
-                  <option value="chandigarh">Chandigarh</option>
-                  <option value="puducherry">Puducherry</option>
                 </select>
               </div>
             </div>
@@ -277,18 +217,11 @@ const Register: React.FC = () => {
             </Button>
             <div className="text-center">
               <p className="text-sm text-gray-700">
-                {t('register.have_account')}{' '}
-                <Link
-                  to="/login"
-                  className="font-bold text-black hover:underline"
-                >
-                  {t('register.sign_in')}
+                {t("register.have_account")}{" "}
+                <Link to="/login" className="font-bold text-black hover:underline">
+                  {t("register.sign_in")}
                 </Link>
               </p>
-            </div>
-            {/* Government Disclaimer */}
-            <div className="mt-6 pt-4 border-t border-[#e0e3ef]">
-              <p className="text-xs text-gray-600 text-center">{t('register.secure_account')}</p>
             </div>
           </form>
         </div>

@@ -1,13 +1,13 @@
-import type { AgreementProcess, AgreementSummary } from "../types";
+import type { AgreementProcess } from "../types";
 import api from "../utils/baseApi";
 
 export const agreementService = {
-    async agreementProcess(data: AgreementProcess): Promise<AgreementProcess> {
+    async agreementProcess(data: AgreementProcess): Promise<any> {
         const response = await api.post('/agreements/agreement-process', data);
         return response.data;
     },
 
-    async agreementSummary(file: File, uid: string, targetGroup: string, language: string): Promise<AgreementSummary> {
+    async agreementSummary(file: File, uid: string, targetGroup: string, language: string): Promise<any> {
         const formData = new FormData();
         formData.append('file', file);
         formData.append('uid', uid);

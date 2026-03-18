@@ -39,8 +39,8 @@ export default function LandingPage() {
         <p className="text-lg text-gray-700 mb-8">{t("landing.tech_stack.description")}</p>
         <div className="flex flex-wrap justify-center gap-6">
           <TechBadge imgSrc={gemini} name={t("landing.tech_stack.google_gemini")} />
-          <TechBadge imgSrc="https://firebase.google.com/downloads/brand-guidelines/PNG/logo-vertical.png" name={t("landing.tech_stack.firebase_auth")} />
-          <TechBadge imgSrc="https://firebase.google.com/downloads/brand-guidelines/PNG/logo-logomark.png" name={t("landing.tech_stack.firebase_db")} />
+          <TechBadge imgSrc="https://www.svgrepo.com/show/306500/openid.svg" name="JWT Authentication" />
+          <TechBadge imgSrc="https://www.svgrepo.com/show/331488/mongodb.svg" name="MongoDB Atlas" />
           <TechBadge imgSrc="https://upload.wikimedia.org/wikipedia/commons/d/db/Google_Translate_Icon.png" name={t("landing.tech_stack.google_translate")} />
           <TechBadge imgSrc={vertexAi} name={t("landing.tech_stack.vertex_ai")} />
           <TechBadge imgSrc={indiankanoon} name={t("landing.tech_stack.indiankanoon")} />

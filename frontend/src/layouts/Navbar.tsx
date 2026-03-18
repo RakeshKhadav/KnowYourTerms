@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import { getAuth, signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import i18n from "../utils/i18n";
@@ -7,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import {LanguageDropdown, SolutionsDropdown} from "./Dropdown";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import { LogOut } from "lucide-react";
-import { getCurrentUserAsync } from "../store/authSlice";
+import { logoutAsync } from "../store/authSlice";
 import Button from "../components/common/Button";
 
 
@@ -23,9 +22,7 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await signOut(getAuth());
-    localStorage.removeItem("idToken");
-    dispatch(getCurrentUserAsync());
+    await dispatch(logoutAsync());
     navigate("/login");
   };
 

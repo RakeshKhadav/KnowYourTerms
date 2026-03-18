@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import hammer from "../../assets/hammer-Photoroom.png"
-import { geminiKey } from '../../utils/baseApi';
+import api from '../../utils/baseApi';
 
 // Define the shape of a message object
 interface Message {
@@ -51,51 +51,13 @@ const Chatbot: React.FC = () => {
         setMessages((prevMessages) => [...prevMessages, typingMessage]);
 
         try {
-            // Get API key from environment variables
-            if (!geminiKey) {
-                console.error('Gemini API key is not set. Please check your .env file.');
-                throw new Error('API key is not configured');
-            }
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiKey}`;
-
-            const systemPrompt = "Act as an expert in Indian legal topics, with a focus on providing detailed and comprehensive answers. If a query is unrelated to Indian law, start by reading whether the user is a student, a startup owner, or a citizen, and respond accordingly to their further questions. Politely inform the user that you can only assist with legal topics and recommend that they consult another resource for their specific question. If necessary, remind the user that you are not a lawyer and cannot provide legal advice. Provide answers in approximately 75 words.";
-
-            const payload = {
-                contents: [{ parts: [{ text: userMessageText }] }],
-                tools: [{ "google_search": {} }],
-                systemInstruction: { parts: [{ text: systemPrompt }] },
-            };
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
+            const response = await api.post('/agents/public-chatbot', {
+                message: userMessageText,
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-            const candidate = result.candidates?.[0];
-            const botResponseText = candidate?.content?.parts?.[0]?.text || 'Sorry, I couldn\'t generate a response. Please try again.';
-
-            // 3. Add citations if available
-            const groundingMetadata = candidate?.groundingMetadata;
-            let sources: { uri: string; title: string }[] = [];
-            if (groundingMetadata && groundingMetadata.groundingAttributions) {
-                sources = groundingMetadata.groundingAttributions
-                    .map((attribution: any) => ({
-                        uri: attribution.web?.uri,
-                        title: attribution.web?.title,
-                    }))
-                    .filter(
-                        (source: { uri: any; title: any }) =>
-                            source.uri && source.title
-                    );
-            }
+            const botResponseText =
+                response?.data?.data?.text || "Sorry, I couldn't generate a response. Please try again.";
+            const sources: { uri: string; title: string }[] = response?.data?.data?.citations || [];
 
             // Remove the typing message and add the actual bot response with citations
             setMessages((prevMessages) => {
@@ -115,7 +77,7 @@ const Chatbot: React.FC = () => {
                 const newMessages = [...prevMessages];
                 newMessages.pop();
                 newMessages.push({
-                    text: 'An error occurred. Please try again.',
+                    text: 'An error occurred while contacting legal assistant. Please try again.',
                     sender: 'bot',
                 });
                 return newMessages;

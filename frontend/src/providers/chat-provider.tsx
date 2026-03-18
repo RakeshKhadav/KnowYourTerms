@@ -45,7 +45,7 @@ export const ChatProvider = ({ user, children }: ChatProviderProps) => {
   /**
    * Create the Stream Chat client with automatic token management.
    * This handles:
-   * - Initial authentication with Firebase-authenticated backend
+   * - Initial authentication with JWT-authenticated backend
    * - WebSocket connection management
    * - Automatic token refresh
    * - Real-time event handling

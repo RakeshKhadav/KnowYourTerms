@@ -24,7 +24,7 @@ import type { User } from './lib/components';
 const AgentChatWrapper = () => {
   const { user } = useAppSelector((state) => state.auth);
   const location = useLocation();
-  
+
   // Convert frontend-term user to Stream Chat user format with useMemo to prevent reconnections
   const streamUser: User = useMemo(() => ({
     id: user?.uid || 'anonymous',
@@ -34,7 +34,7 @@ const AgentChatWrapper = () => {
 
   // Get summary data from URL params
   const summaryData = new URLSearchParams(location.search).get('summary') || '';
-  
+
   const handleLogout = () => {
     // You can implement logout logic here if needed
     console.log('Logout from agent chat');
@@ -42,7 +42,7 @@ const AgentChatWrapper = () => {
 
   return (
     <div className="h-screen bg-background">
-      <AuthenticatedApp 
+      <AuthenticatedApp
         user={streamUser}
         onLogout={handleLogout}
         summaryData={summaryData}
@@ -56,7 +56,11 @@ function App() {
   const { isAuthenticated } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
-    dispatch(getCurrentUserAsync());
+    // Only try to fetch user if a token exists in local storage
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      dispatch(getCurrentUserAsync());
+    }
   }, [dispatch]);
 
   // Helper to extract targetGroup from query param and map to category
@@ -103,7 +107,7 @@ function App() {
             <Route path="/dashboard/agreement/summary" element={isAuthenticated ? <SummaryPageWithTargetGroup /> : <Login />} />
             <Route path="/dashboard/case/case-details" element={isAuthenticated ? <CasesList /> : <Login />} />
             <Route path="/dashboard/process/summary" element={isAuthenticated ? <AgreementProcess /> : <Login />} />
-            <Route path="/agent/chat" element={ isAuthenticated ? <AgentChatWrapper /> : <Login /> } />
+            <Route path="/agent/chat" element={isAuthenticated ? <AgentChatWrapper /> : <Login />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>

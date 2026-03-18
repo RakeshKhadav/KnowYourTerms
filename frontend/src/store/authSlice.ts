@@ -1,11 +1,10 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { toast } from 'react-toastify';
-
-import { authService } from '../services/authService';
-import type { User } from 'firebase/auth';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { toast } from "react-toastify";
+import { authService } from "../services/authService";
+import type { AuthUser } from "../types/auth";
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
@@ -13,57 +12,83 @@ interface AuthState {
 
 const initialState: AuthState = {
   user: null,
-  isAuthenticated: !!localStorage.getItem('idToken'),
+  isAuthenticated: !!localStorage.getItem("accessToken"),
   loading: false,
   error: null,
 };
 
 export const registerAsync = createAsyncThunk(
-  'auth/register',
-  async (userData: { email: string; displayName: string; region: string; language: string }, { rejectWithValue }) => {
+  "auth/register",
+  async (
+    userData: {
+      email: string;
+      password: string;
+      displayName: string;
+      region: string;
+      language: string;
+    },
+    { rejectWithValue },
+  ) => {
     try {
       const response = await authService.register(userData);
-      return response;
+      localStorage.setItem("accessToken", response.accessToken);
+      return response.user;
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Registration failed';
+      const message = error.response?.data?.message || "Registration failed";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
+);
+
+export const loginAsync = createAsyncThunk(
+  "auth/login",
+  async (credentials: { email: string; password: string }, { rejectWithValue }) => {
+    try {
+      const response = await authService.login(credentials);
+      localStorage.setItem("accessToken", response.accessToken);
+      toast.success("Login successful!");
+      return response.user;
+    } catch (error: any) {
+      const message = error.response?.data?.message || "Login failed";
+      toast.error(message);
+      return rejectWithValue(message);
+    }
+  },
 );
 
 export const getCurrentUserAsync = createAsyncThunk(
-  'auth/getCurrentUser',
+  "auth/getCurrentUser",
   async (_, { rejectWithValue }) => {
     try {
       const user = await authService.getCurrentUser();
-      // console.log('Fetched user:', user);
       return user;
-    } catch (error: any) {
-      localStorage.removeItem('idToken');
-      return rejectWithValue('Session expired');
+    } catch (_error: any) {
+      localStorage.removeItem("accessToken");
+      return rejectWithValue("Session expired");
     }
-  }
+  },
 );
 
-export const logoutAsync = createAsyncThunk(
-  'auth/logout',
-  async () => {
-    localStorage.removeItem('idToken');
-    toast.success('Logged out successfully');
-    return null;
+export const logoutAsync = createAsyncThunk("auth/logout", async () => {
+  try {
+    await authService.logout();
+  } finally {
+    localStorage.removeItem("accessToken");
   }
-);
+  toast.success("Logged out successfully");
+  return null;
+});
 
 const authSlice = createSlice({
-  name: 'auth',
+  name: "auth",
   initialState,
   reducers: {
     logout: (state) => {
       state.user = null;
       state.isAuthenticated = false;
       state.error = null;
-      localStorage.removeItem('idToken');
+      localStorage.removeItem("accessToken");
     },
     clearError: (state) => {
       state.error = null;
@@ -71,7 +96,38 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Get current user
+      .addCase(registerAsync.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(registerAsync.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+        state.isAuthenticated = true;
+        state.error = null;
+      })
+      .addCase(registerAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.user = null;
+        state.isAuthenticated = false;
+        state.error = action.payload as string;
+        localStorage.removeItem("accessToken");
+      })
+      .addCase(loginAsync.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(loginAsync.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+        state.isAuthenticated = true;
+        state.error = null;
+      })
+      .addCase(loginAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.user = null;
+        state.isAuthenticated = false;
+        state.error = action.payload as string;
+        localStorage.removeItem("accessToken");
+      })
       .addCase(getCurrentUserAsync.pending, (state) => {
         state.loading = true;
       })
@@ -86,9 +142,8 @@ const authSlice = createSlice({
         state.user = null;
         state.isAuthenticated = false;
         state.error = action.payload as string;
-        localStorage.removeItem('idToken');
+        localStorage.removeItem("accessToken");
       })
-      // Logout
       .addCase(logoutAsync.fulfilled, (state) => {
         state.user = null;
         state.isAuthenticated = false;
