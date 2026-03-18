@@ -44,8 +44,9 @@ export class GeminiAgent implements AIAgent {
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
+    const modelName = process.env.GEMINI_AGENT_MODEL || "gemini-2.5-flash";
     this.model = this.genAI.getGenerativeModel({
-      model: "gemini-2.5-pro",
+      model: modelName,
       systemInstruction: this.getWritingAssistantPrompt(this.agreementSummary),
       tools: [
         {

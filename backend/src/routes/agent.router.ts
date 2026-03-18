@@ -6,9 +6,12 @@ import {
   generateToken,
   getSystemInfo
 } from '../controllers/agent.controller';
+import { publicLegalChatbot } from '../controllers/chatbot.controller';
 import { authenticate } from '../middlewares/auth';
 
 const router = Router();
+
+router.post("/public-chatbot", publicLegalChatbot);
 
 // AI Agent management routes
 router.post("/start-ai-agent", authenticate, startAiAgent);

@@ -2,14 +2,18 @@ import { Request, Response } from "express";
 import { ApiError } from "../utility/ApiError";
 import { asyncHandler } from "../utility/asyncHandler";
 import ApiResponse from "../utility/ApiResponse";
-import { processWithGemini, summarizeAgreementWithGemini, translateText } from "../services/geminiApi.services";
+import {
+  extractTextFromFileWithGemini,
+  processWithGemini,
+  summarizeAgreementWithGemini,
+  translateText,
+} from "../services/geminiApi.services";
 import { createAuditLog } from "./admin.controller";
-import axios from "axios";
-import FormData from 'form-data';
-import fs from 'fs';
+import fs from "fs";
 
 const agreementSummary = asyncHandler(async (req: Request, res: Response) => {
-    const { uid, language, targetGroup } = req.body;
+    const { language, targetGroup } = req.body;
+    const uid = req.user?.uid || req.body.uid;
 
     if (!uid || !targetGroup) {
         await createAuditLog({
@@ -17,9 +21,9 @@ const agreementSummary = asyncHandler(async (req: Request, res: Response) => {
             action: 'AGREEMENT_SUMMARY',
             status: 'failure',
             entityType: 'Agreement',
-            details: 'Missing uid, file, or targetGroup',
+            details: 'Missing uid or targetGroup',
         });
-        throw new ApiError(400, 'uid, file, and targetGroup are required');
+        throw new ApiError(400, 'uid and targetGroup are required');
     }
 
     const file = (req.files && (req.files as any)['file'] && (req.files as any)['file'][0]) || null;
@@ -28,34 +32,17 @@ const agreementSummary = asyncHandler(async (req: Request, res: Response) => {
         throw new ApiError(400, 'File is required');
     }
 
-    // file.path is the path to the file saved by multer
-    const formData = new FormData();
     const filePath = (file && file.path) || null;
-    let readStream: fs.ReadStream | null = null;
 
     try {
         if (!filePath) {
             throw new ApiError(400, "Uploaded file path is missing");
         }
 
-        readStream = fs.createReadStream(filePath);
-        formData.append("file", readStream, file.originalname);
+        const fileBuffer = await fs.promises.readFile(filePath);
+        const agreementText = await extractTextFromFileWithGemini(fileBuffer, file.mimetype);
 
-        // Normalize category: map 'business_owner' -> 'business'
-        const category = targetGroup === 'business_owner' ? 'business' : targetGroup;
-        formData.append('category', category);
-    
-        const modelResponse = await axios.post(`${process.env.AI_MODEL_URL}/uploads`, formData, {
-            headers: {
-                ...formData.getHeaders(),
-            },
-        });
-    
-        let agreementText = modelResponse.data.extracted_text.replace(/\\n/g, '\n');
-    
-        // console.log("Agreement text extracted ", agreementText);
-    
-        if (!agreementText) {
+        if (!agreementText || !agreementText.trim()) {
             await createAuditLog({
                 uid: uid || 'unknown',
                 action: 'AGREEMENT_SUMMARY',
@@ -63,7 +50,7 @@ const agreementSummary = asyncHandler(async (req: Request, res: Response) => {
                 entityType: 'Agreement',
                 details: 'Failed to retrieve agreement text',
             });
-            throw new ApiError(500, 'Failed to retrieve agreement text from ai model');
+            throw new ApiError(500, 'Failed to extract agreement text with Gemini');
         }
     
         // Optimized prompt templates for each target group
@@ -247,9 +234,7 @@ const agreementSummary = asyncHandler(async (req: Request, res: Response) => {
                     ${agreementText}
                 `;
                 break;
-    
-                        break;
-    
+
                 default:
                 throw new ApiError(400, 'Invalid targetGroup');
         }
@@ -311,24 +296,16 @@ const agreementSummary = asyncHandler(async (req: Request, res: Response) => {
             });
             throw error;
         }
-    } catch (error) {
-        throw new ApiError(500, 'Internal server error during agreement summary processing');
+    } catch (error: any) {
+        if (error instanceof ApiError) {
+            throw error;
+        }
+        throw new ApiError(
+            500,
+            error?.message || 'Internal server error during agreement summary processing'
+        );
     } finally {
-            // Ensure stream is closed/destroyed and temporary file is removed
-        try {
-            if (readStream) {
-                // modern Node streams have close, destroy; attempt both safely
-                try {
-                // @ts-ignore - close may not exist on older stream types
-                if (typeof readStream.close === "function") readStream.close();
-                } catch (_) {}
-                try {
-                readStream.destroy();
-                } catch (_) {}
-            }
-        } catch (_) {}
-
-            if (filePath) {
+        if (filePath) {
             // use promises API to await unlink; swallow errors to avoid masking original error
             try {
                 await fs.promises.unlink(filePath);
@@ -342,7 +319,8 @@ const agreementSummary = asyncHandler(async (req: Request, res: Response) => {
 
 // agreemental process
 const processAgreement = asyncHandler(async (req: Request, res: Response) => {
-    const { uid, processType, language } = req.body;
+    const { processType, language } = req.body;
+    const uid = req.user?.uid || req.body.uid;
 
     if (!uid || !processType) {
         await createAuditLog({
@@ -417,19 +395,33 @@ const uploadFile = asyncHandler(async (req: Request, res: Response) => {
         throw new ApiError(400, 'File is required');
     }
 
-    // file.path is the path to the file saved by multer
-    const formData = new FormData();
-    formData.append('file', fs.createReadStream(file.path), file.originalname);
-
+    const filePath = file.path;
     try {
-        const response = await axios.post('http://127.0.0.1:5000/uploads', formData, {
-            headers: {
-                ...formData.getHeaders(),
-            },
-        });
-        return res.status(200).json(new ApiResponse(200, response.data, 'File uploaded successfully'));
-    } catch (error) {
-        throw new ApiError(500, 'File upload failed');
+        const fileBuffer = await fs.promises.readFile(filePath);
+        const extractedText = await extractTextFromFileWithGemini(fileBuffer, file.mimetype);
+
+        return res.status(200).json(
+            new ApiResponse(
+                200,
+                {
+                    filename: file.originalname,
+                    mimeType: file.mimetype,
+                    extractedText,
+                },
+                'File processed successfully'
+            )
+        );
+    } catch (error: any) {
+        if (error instanceof ApiError) {
+            throw error;
+        }
+        throw new ApiError(500, error?.message || 'File processing failed');
+    } finally {
+        if (filePath) {
+            try {
+                await fs.promises.unlink(filePath);
+            } catch (_) {}
+        }
     }
 });
 
