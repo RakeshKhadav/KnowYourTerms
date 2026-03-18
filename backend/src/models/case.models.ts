@@ -9,7 +9,7 @@ export interface CaseModel {
   status: string;
   summary?: string;
   relatedLaws?: string[];
-  createdAt: FirebaseFirestore.Timestamp;
-  updatedAt: FirebaseFirestore.Timestamp;
+  createdAt: Date;
+  updatedAt: Date;
   metadata?: Record<string, any>;
 }

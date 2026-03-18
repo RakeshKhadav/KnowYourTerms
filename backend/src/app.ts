@@ -1,8 +1,7 @@
 import express, { Request, Response, NextFunction, ErrorRequestHandler } from "express";
 import cors from "cors";
-import path from "path";
 import dotenv from "dotenv";
-import admin from "./db/firebase";
+import cookieParser from "cookie-parser";
 import { ApiError } from "./utility/ApiError";
 import ApiResponse from "./utility/ApiResponse";
 import userRouter from './routes/user.router';
@@ -25,14 +24,7 @@ app.use(cors({
 // Body parsers
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Firebase connection check middleware (optional, for debugging)
-app.use((req, res, next) => {
-  if (!admin.apps.length) {
-    return next(new ApiError(500, "Firebase not initialized"));
-  }
-  next();
-});
+app.use(cookieParser());
 
 // Routes
 app.use('/api/v1/users', userRouter);
@@ -60,6 +52,8 @@ app.get("/api/v1/active", (req: Request, res: Response) => {
 
 // Centralized error handler
 const errorHandler: ErrorRequestHandler = (err: any, req: Request, res: Response, next: NextFunction): void => {
+  console.error("Global Error Handler Caught:", err); // Log full error for debugging
+
   if (err instanceof ApiError) {
     res.status(err.statusCode).json({
       success: false,
@@ -68,11 +62,11 @@ const errorHandler: ErrorRequestHandler = (err: any, req: Request, res: Response
     });
     return;
   }
-  // Firebase errors
-  if (err.code && err.code.startsWith('auth/')) {
+  // JWT/Auth errors
+  if (err.name === "TokenExpiredError" || err.name === "JsonWebTokenError") {
     res.status(401).json({
       success: false,
-      message: err.message || 'Firebase Auth Error',
+      message: err.message || "Authentication error",
     });
     return;
   }

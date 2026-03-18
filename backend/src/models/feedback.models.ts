@@ -3,7 +3,7 @@ export interface FeedbackModel {
   uid: string;
   feedback: string;
   rating?: number;
-  createdAt: FirebaseFirestore.Timestamp;
+  createdAt: Date;
   relatedDocId?: string; // e.g., agreement, process, or case
   metadata?: Record<string, any>;
 }

@@ -1,31 +1,67 @@
+import { model, Schema, type Document } from "mongoose";
 
-// Model for storing AI-extracted process results in user search history
 export interface ProcessHistory {
-  id: string;  // (Firestore doc ID)
-  uid: string; // User UID 
-  processType: string; // e.g., 'rental agreement', 'loan agreement'
-  processedAt: FirebaseFirestore.Timestamp;
-
-  // AI-extracted process results
-  processSteps: string; // What is the process for this task?
-  requiredDocuments: string; // What documents are required?
-  creationLinks: string; // Where to create documents (websites/links)
-  priceInfo: string; // What are the prices of the document?
-  needExpert: string; // When do you need a lawyer or CA?
-
+  uid: string;
+  processType: string;
+  processedAt: Date;
+  processSteps: string[];
+  requiredDocuments: string[];
+  creationLinks: Array<Record<string, any> | string>;
+  priceInfo: Array<Record<string, any> | string>;
+  needExpert: string[] | string;
   aiRawOutput?: any;
   language?: string;
 }
 
-// Model for storing AI-extracted agreement results in user search history
 export interface AgreementHistory {
-  id: string; // (Firestore doc ID)
-  uid: string; // User UID
-  targetGroup?: string; // Optional: target group (e.g., 'citizen', 'business', 'student')
-  processedAt: FirebaseFirestore.Timestamp;
-
-  // Unstructured or semi-structured summary from Gemini
-  summary: string; // The AI-generated summary or explanation (unstructured text)
-  aiRawOutput?: any; // The full raw output from Gemini
+  uid: string;
+  targetGroup?: string;
+  processedAt: Date;
+  summary: string;
+  aiRawOutput?: any;
   language?: string;
 }
+
+export interface ProcessHistoryDocument extends ProcessHistory, Document {}
+export interface AgreementHistoryDocument extends AgreementHistory, Document {}
+
+const processHistorySchema = new Schema<ProcessHistoryDocument>(
+  {
+    uid: { type: String, required: true, index: true },
+    processType: { type: String, required: true },
+    processedAt: { type: Date, default: Date.now, index: true },
+    processSteps: { type: [String], default: [] },
+    requiredDocuments: { type: [String], default: [] },
+    creationLinks: { type: [Schema.Types.Mixed], default: [] },
+    priceInfo: { type: [Schema.Types.Mixed], default: [] },
+    needExpert: { type: Schema.Types.Mixed, default: [] },
+    aiRawOutput: { type: Schema.Types.Mixed },
+    language: { type: String, default: "en" },
+  },
+  { versionKey: false },
+);
+
+const agreementHistorySchema = new Schema<AgreementHistoryDocument>(
+  {
+    uid: { type: String, required: true, index: true },
+    targetGroup: { type: String, default: "student" },
+    processedAt: { type: Date, default: Date.now, index: true },
+    summary: { type: String, required: true },
+    aiRawOutput: { type: Schema.Types.Mixed },
+    language: { type: String, default: "en" },
+  },
+  { versionKey: false },
+);
+
+processHistorySchema.index({ uid: 1, processedAt: -1 });
+agreementHistorySchema.index({ uid: 1, processedAt: -1 });
+
+export const ProcessHistoryModel = model<ProcessHistoryDocument>(
+  "ProcessHistory",
+  processHistorySchema,
+);
+
+export const AgreementHistoryModel = model<AgreementHistoryDocument>(
+  "AgreementHistory",
+  agreementHistorySchema,
+);
