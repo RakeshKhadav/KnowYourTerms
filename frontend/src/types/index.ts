@@ -1,12 +1,28 @@
 // Shared types for agreement summaries
+export interface ClauseCitation {
+  quote: string;
+  location: string;
+}
+
 export interface BusinessClause {
   title: string;
   explanation: string;
   risk: string;
   improvement: string;
+  citations?: ClauseCitation[];
+}
+
+export interface DeterministicRiskFinding {
+  ruleId: string;
+  title: string;
+  severity: "high" | "medium" | "low";
+  issue: string;
+  recommendation: string;
+  citations: ClauseCitation[];
 }
 
 export interface BusinessOutput {
+  title?: string;
   about: string;
   clauses: BusinessClause[];
   financials: {
@@ -15,7 +31,13 @@ export interface BusinessOutput {
     lateFee: string;
   };
   keyComplianceNotes: string[];
-  finalAssessment: { overallRisk: string; comment: string };
+  finalAssessment: {
+    overallScore?: number;
+    overallRisk?: string;
+    comment: string;
+    recommendations?: string[];
+  };
+  deterministicRiskFindings?: DeterministicRiskFinding[];
 }
 export interface User {
   name?: string;

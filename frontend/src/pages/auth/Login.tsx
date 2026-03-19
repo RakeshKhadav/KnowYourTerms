@@ -95,7 +95,7 @@ const Login: React.FC = () => {
             </div>
 
             <div className="rounded-lg border border-[#e6e1d5] bg-[#fff8eb] px-4 py-3 text-sm text-[#5c4a1f]">
-              <p className="font-semibold">Recruiter Login (Demo)</p>
+              <p className="font-semibold">Demo Login</p>
               <p>Email: {RECRUITER_CREDENTIALS.email}</p>
               <p>Password: {RECRUITER_CREDENTIALS.password}</p>
               <button

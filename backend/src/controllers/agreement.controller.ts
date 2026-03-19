@@ -3,11 +3,18 @@ import { ApiError } from "../utility/ApiError";
 import { asyncHandler } from "../utility/asyncHandler";
 import ApiResponse from "../utility/ApiResponse";
 import {
-  extractTextFromFileWithGemini,
+  extractTextFromFileSmart,
   processWithGemini,
-  summarizeAgreementWithGemini,
+  summarizeAgreementWithGeminiStructured,
   translateText,
 } from "../services/geminiApi.services";
+import {
+  parseBusinessSummaryOutput,
+  parseCitizenSummaryOutput,
+  parseStudentSummaryOutput,
+  SUMMARY_RESPONSE_SCHEMAS,
+  type SummaryTargetGroup,
+} from "../services/agreementSummary.service";
 import { createAuditLog } from "./admin.controller";
 import fs from "fs";
 
@@ -40,7 +47,7 @@ const agreementSummary = asyncHandler(async (req: Request, res: Response) => {
         }
 
         const fileBuffer = await fs.promises.readFile(filePath);
-        const agreementText = await extractTextFromFileWithGemini(fileBuffer, file.mimetype);
+        const agreementText = await extractTextFromFileSmart(fileBuffer, file.mimetype);
 
         if (!agreementText || !agreementText.trim()) {
             await createAuditLog({
@@ -239,9 +246,29 @@ const agreementSummary = asyncHandler(async (req: Request, res: Response) => {
                 throw new ApiError(400, 'Invalid targetGroup');
         }
     
+        const validatorByTargetGroup: Record<SummaryTargetGroup, (raw: unknown) => unknown> = {
+            citizen: (raw: unknown) => parseCitizenSummaryOutput(raw, agreementText),
+            student: (raw: unknown) => parseStudentSummaryOutput(raw, agreementText),
+            business_owner: (raw: unknown) => parseBusinessSummaryOutput(raw, agreementText),
+        };
+
+        const selectedValidator = validatorByTargetGroup[targetGroup as SummaryTargetGroup];
+        const selectedResponseSchema = SUMMARY_RESPONSE_SCHEMAS[targetGroup as SummaryTargetGroup];
+
+        if (!selectedValidator || !selectedResponseSchema) {
+            throw new ApiError(400, 'Invalid targetGroup');
+        }
+
         try {
-            // Pass the custom prompt to Gemini
-            const geminiResponse = await summarizeAgreementWithGemini(prompt);
+            const geminiResponse = await summarizeAgreementWithGeminiStructured(
+                prompt,
+                selectedValidator,
+                {
+                    maxAttempts: 2,
+                    responseMimeType: "application/json",
+                    responseSchema: selectedResponseSchema,
+                },
+            );
     
             if (!geminiResponse) {
                 await createAuditLog({
@@ -254,10 +281,7 @@ const agreementSummary = asyncHandler(async (req: Request, res: Response) => {
                 throw new ApiError(500, 'Failed to summarize agreement with Gemini');
             }
     
-            // console.log("AI-generated summary response:", geminiResponse);
-    
-            // Treat Gemini output as unstructured text (summary)
-            let summary = typeof geminiResponse === 'string' ? geminiResponse : JSON.stringify(geminiResponse, null, 2);
+            let summary = JSON.stringify(geminiResponse, null, 2);
     
             // Translate the summary if needed
             if (language && language !== 'en') {
@@ -398,7 +422,7 @@ const uploadFile = asyncHandler(async (req: Request, res: Response) => {
     const filePath = file.path;
     try {
         const fileBuffer = await fs.promises.readFile(filePath);
-        const extractedText = await extractTextFromFileWithGemini(fileBuffer, file.mimetype);
+        const extractedText = await extractTextFromFileSmart(fileBuffer, file.mimetype);
 
         return res.status(200).json(
             new ApiResponse(

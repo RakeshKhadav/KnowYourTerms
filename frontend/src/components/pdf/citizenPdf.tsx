@@ -322,6 +322,26 @@ export function generateCitizenPDF(data: any) {
     y += 4;
   }
 
+  // Deterministic Risk Checks
+  if (Array.isArray(data.deterministicRiskFindings) && data.deterministicRiskFindings.length > 0) {
+    doc.setFontSize(12).setTextColor(34, 64, 123).setFont('helvetica', 'bold');
+    y = addTextBlock(doc, "Deterministic Risk Checks:", 14, y, {});
+    y += 2;
+    data.deterministicRiskFindings.forEach((finding: any) => {
+      if (y > maxY - 28) {
+        doc.addPage();
+        y = 25;
+      }
+      doc.setFontSize(11).setTextColor(60, 60, 60).setFont('helvetica', 'bold');
+      y = addTextBlock(doc, `${finding.title} (${String(finding.severity || '').toUpperCase()})`, 18, y, {});
+      doc.setFontSize(11).setTextColor(60, 60, 60).setFont('helvetica', 'normal');
+      y = addTextBlock(doc, `Issue: ${finding.issue}`, 20, y, {});
+      y = addTextBlock(doc, `Recommendation: ${finding.recommendation}`, 20, y, {});
+      y += 2;
+    });
+    y += 4;
+  }
+
   // If near bottom, add a new page for analogy and footer
   if (y > maxY - 20) {
     doc.addPage();

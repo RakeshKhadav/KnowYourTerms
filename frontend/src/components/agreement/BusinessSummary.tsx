@@ -105,7 +105,7 @@
 
 
 
-import type { BusinessOutput as ImportedBusinessOutput } from '../../types';
+import type { BusinessOutput as ImportedBusinessOutput, DeterministicRiskFinding } from '../../types';
 
 // Type guard for new API shape
 function isNewAssessment(obj: any): obj is { overallScore: number; recommendations: string[] } {
@@ -128,6 +128,12 @@ const renderBoldMarkdown = (text: string) => {
 
       return <span key={`${part}-${index}`}>{part}</span>;
     });
+};
+
+const getSeverityBadgeClasses = (severity: DeterministicRiskFinding["severity"]) => {
+  if (severity === "high") return "bg-red-100 text-red-700 border-red-200";
+  if (severity === "medium") return "bg-amber-100 text-amber-700 border-amber-200";
+  return "bg-emerald-100 text-emerald-700 border-emerald-200";
 };
 
 const CircularScore: React.FC<{ score: number }> = ({ score }) => {
@@ -178,6 +184,9 @@ const CircularScore: React.FC<{ score: number }> = ({ score }) => {
 const BusinessSummary: React.FC<{ aiRawOutput: ImportedBusinessOutput }> = ({ aiRawOutput }) => {
   const assessment = aiRawOutput.finalAssessment;
   const isNew = isNewAssessment(assessment);
+  const deterministicFindings = Array.isArray(aiRawOutput.deterministicRiskFindings)
+    ? aiRawOutput.deterministicRiskFindings
+    : [];
   // Defensive: get title if present and is a string
   const summaryTitle = typeof (aiRawOutput as any).title === 'string' && (aiRawOutput as any).title
     ? (aiRawOutput as any).title
@@ -221,6 +230,22 @@ const BusinessSummary: React.FC<{ aiRawOutput: ImportedBusinessOutput }> = ({ ai
                         </p>
                       </div>
                     </div>
+
+                    {Array.isArray(clause.citations) && clause.citations.length > 0 && (
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 mb-2">
+                          Evidence from Agreement
+                        </p>
+                        <ul className="space-y-2">
+                          {clause.citations.map((citation, citationIndex) => (
+                            <li key={`${citation.location}-${citationIndex}`} className="text-sm text-slate-700 leading-relaxed">
+                              <p className="text-xs text-slate-500 mb-1">{citation.location}</p>
+                              <p>"{citation.quote}"</p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                   </div>
                 ))}
@@ -269,6 +294,36 @@ const BusinessSummary: React.FC<{ aiRawOutput: ImportedBusinessOutput }> = ({ ai
                 }
               </p>
             </div>
+
+            {deterministicFindings.length > 0 && (
+              <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">Deterministic Risk Checks</h3>
+                <div className="space-y-4">
+                  {deterministicFindings.map((finding) => (
+                    <div key={finding.ruleId} className="rounded-xl border border-gray-200 p-4 bg-white shadow-sm">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <p className="text-base font-semibold text-gray-800">{finding.title}</p>
+                        <span className={`text-xs font-semibold uppercase px-2 py-1 rounded-full border ${getSeverityBadgeClasses(finding.severity)}`}>
+                          {finding.severity}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 mb-2">{finding.issue}</p>
+                      <p className="text-sm text-blue-700 mb-3">
+                        <strong>Recommendation:</strong> {finding.recommendation}
+                      </p>
+                      <ul className="space-y-2">
+                        {finding.citations.map((citation, index) => (
+                          <li key={`${finding.ruleId}-${citation.location}-${index}`} className="text-sm text-slate-700">
+                            <p className="text-xs text-slate-500 mb-1">{citation.location}</p>
+                            <p>"{citation.quote}"</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

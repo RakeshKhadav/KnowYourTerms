@@ -153,11 +153,19 @@ export function generateBusinessPDF(data: any) {
     y = addTextBlock(doc, "Final Assessment", 14, y, {});
     y += 2;
     doc.setFontSize(11).setTextColor(40, 40, 40).setFont("helvetica", "normal");
-    if (data.finalAssessment.overallRisk) {
+    if (typeof data.finalAssessment.overallScore === "number") {
+      y = addTextBlock(doc, `Overall Score: ${data.finalAssessment.overallScore}/10`, 18, y, {});
+    } else if (data.finalAssessment.overallRisk) {
       y = addTextBlock(doc, `Overall Risk: ${data.finalAssessment.overallRisk}`, 18, y, {});
     }
     if (data.finalAssessment.comment) {
       y = addTextBlock(doc, data.finalAssessment.comment, 18, y, {});
+    }
+    if (Array.isArray(data.finalAssessment.recommendations) && data.finalAssessment.recommendations.length > 0) {
+      y = addTextBlock(doc, "Recommendations:", 18, y, {});
+      data.finalAssessment.recommendations.forEach((item: string) => {
+        y = addTextBlock(doc, ` • ${item}`, 20, y, {});
+      });
     }
     y += 6;
   }

@@ -68,6 +68,8 @@ interface GeminiGenerateOptions {
   model?: string;
   systemInstruction?: string;
   tools?: any[];
+  responseMimeType?: "application/json" | "text/plain";
+  responseSchema?: Record<string, unknown>;
 }
 
 interface GeminiCitation {
@@ -79,6 +81,94 @@ interface GeminiGenerateResult {
   text: string;
   citations: GeminiCitation[];
 }
+
+const SUPPORTED_MIME_TYPES = new Set<string>([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+]);
+
+const LOCAL_EXTRACTION_MIME_TYPES = new Set<string>([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+]);
+
+const extractFirstBalancedJsonObject = (text: string): string | null => {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = start; i < text.length; i += 1) {
+    const char = text[i];
+
+    if (inString) {
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+      if (char === "\\") {
+        escapeNext = true;
+        continue;
+      }
+      if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{") depth += 1;
+    if (char === "}") depth -= 1;
+
+    if (depth === 0) {
+      return text.slice(start, i + 1);
+    }
+  }
+
+  return null;
+};
+
+const parseJsonFromModelText = (rawText: string): unknown => {
+  const text = String(rawText || "").trim();
+  if (!text) {
+    throw new Error("Model returned an empty response.");
+  }
+
+  const codeBlockMatch = text.match(/```(?:json)?\n([\s\S]*?)\n```/i);
+  const candidateFromCodeBlock = codeBlockMatch?.[1]?.trim();
+
+  const directCandidates = [candidateFromCodeBlock, text].filter(
+    (item): item is string => Boolean(item && item.trim()),
+  );
+
+  for (const candidate of directCandidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      const objectCandidate = extractFirstBalancedJsonObject(candidate);
+      if (!objectCandidate) continue;
+      try {
+        return JSON.parse(objectCandidate);
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  throw new Error("Could not parse valid JSON object from model response.");
+};
 
 const generateWithGemini = async (
   prompt: string,
@@ -97,6 +187,13 @@ const generateWithGemini = async (
 
   if (options.tools?.length) {
     requestBody.tools = options.tools;
+  }
+
+  if (options.responseMimeType || options.responseSchema) {
+    requestBody.generationConfig = {
+      ...(options.responseMimeType ? { responseMimeType: options.responseMimeType } : {}),
+      ...(options.responseSchema ? { responseSchema: options.responseSchema } : {}),
+    };
   }
 
   try {
@@ -144,15 +241,53 @@ export async function summarizeAgreementWithGemini(prompt: string): Promise<any>
   const { text } = await generateWithGemini(prompt, {
     model: getGeminiModel(),
   });
-
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  const candidateText = jsonMatch ? jsonMatch[0] : text;
-
   try {
-    return JSON.parse(candidateText);
+    return parseJsonFromModelText(text);
   } catch {
-    return candidateText;
+    return text;
   }
+}
+
+export async function summarizeAgreementWithGeminiStructured<T>(
+  prompt: string,
+  validator: (raw: unknown) => T,
+  options: {
+    maxAttempts?: number;
+    responseMimeType?: "application/json" | "text/plain";
+    responseSchema?: Record<string, unknown>;
+  } = {},
+): Promise<T> {
+  const maxAttempts = Math.min(5, Math.max(1, options.maxAttempts ?? 2));
+  let attemptPrompt = prompt;
+  let lastErrorMessage = "Unknown validation error";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const { text } = await generateWithGemini(attemptPrompt, {
+      model: getGeminiModel(),
+      responseMimeType: options.responseMimeType,
+      responseSchema: options.responseSchema,
+    });
+
+    try {
+      const parsed = parseJsonFromModelText(text);
+      return validator(parsed);
+    } catch (error: unknown) {
+      lastErrorMessage = error instanceof Error ? error.message : String(error);
+      if (attempt === maxAttempts) break;
+
+      attemptPrompt = `${prompt}
+
+Important:
+- Return ONLY one JSON object (no markdown, no extra text).
+- The response MUST pass this validation: ${lastErrorMessage}
+- Keep all required keys and correct data types.`;
+    }
+  }
+
+  throw new ApiError(
+    502,
+    `Model returned invalid structured output after ${maxAttempts} attempts. ${lastErrorMessage}`,
+  );
 }
 
 export async function processWithGemini(task: string): Promise<any> {
@@ -180,7 +315,7 @@ Task: ${task}`;
   });
 
   try {
-    return JSON.parse(text);
+    return parseJsonFromModelText(text);
   } catch {
     return { raw: text };
   }
@@ -202,6 +337,68 @@ export async function chatbotWithGemini(message: string): Promise<{
   return result;
 }
 
+const normalizeExtractedText = (text: string): string => {
+  return String(text || "")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
+const hasLegalSignals = (text: string): boolean => {
+  const legalSignalPattern =
+    /\b(agreement|contract|clause|party|parties|liability|termination|payment|jurisdiction|confidential|obligation|indemnity)\b/i;
+  return legalSignalPattern.test(text);
+};
+
+const isHighQualityLocalExtraction = (text: string): boolean => {
+  const normalized = normalizeExtractedText(text);
+  if (normalized.length < 1200) return false;
+  if (!hasLegalSignals(normalized)) return false;
+
+  const alnumCount = (normalized.match(/[a-z0-9]/gi) || []).length;
+  const symbolCount = (normalized.match(/[^a-z0-9\s]/gi) || []).length;
+
+  if (alnumCount < 500) return false;
+  if (symbolCount > alnumCount * 0.9) return false;
+
+  return true;
+};
+
+const extractPdfLocally = async (fileBuffer: Buffer): Promise<string> => {
+  const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text?: string }>;
+  const parsed = await pdfParse(fileBuffer);
+  return normalizeExtractedText(parsed?.text || "");
+};
+
+const extractDocxLocally = async (fileBuffer: Buffer): Promise<string> => {
+  const mammoth = require("mammoth") as {
+    extractRawText: (input: { buffer: Buffer }) => Promise<{ value?: string }>;
+  };
+  const parsed = await mammoth.extractRawText({ buffer: fileBuffer });
+  return normalizeExtractedText(parsed?.value || "");
+};
+
+const extractTextLocally = async (fileBuffer: Buffer, mimeType: string): Promise<string | null> => {
+  if (!LOCAL_EXTRACTION_MIME_TYPES.has(mimeType)) {
+    return null;
+  }
+
+  if (mimeType === "text/plain") {
+    return normalizeExtractedText(fileBuffer.toString("utf-8"));
+  }
+
+  if (mimeType === "application/pdf") {
+    return extractPdfLocally(fileBuffer);
+  }
+
+  if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    return extractDocxLocally(fileBuffer);
+  }
+
+  return null;
+};
+
 export async function extractTextFromFileWithGemini(
   fileBuffer: Buffer,
   mimeType: string,
@@ -210,17 +407,7 @@ export async function extractTextFromFileWithGemini(
     throw new ApiError(400, "Uploaded file is empty");
   }
 
-  const supportedMimeTypes = new Set<string>([
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "text/plain",
-    "image/png",
-    "image/jpeg",
-    "image/webp",
-  ]);
-
-  if (!supportedMimeTypes.has(mimeType)) {
+  if (!SUPPORTED_MIME_TYPES.has(mimeType)) {
     throw new ApiError(400, `Unsupported file type: ${mimeType}`);
   }
 
@@ -264,6 +451,30 @@ export async function extractTextFromFileWithGemini(
   } catch (error: any) {
     throw mapGeminiError(error);
   }
+}
+
+export async function extractTextFromFileSmart(
+  fileBuffer: Buffer,
+  mimeType: string,
+): Promise<string> {
+  if (!fileBuffer?.length) {
+    throw new ApiError(400, "Uploaded file is empty");
+  }
+
+  if (!SUPPORTED_MIME_TYPES.has(mimeType)) {
+    throw new ApiError(400, `Unsupported file type: ${mimeType}`);
+  }
+
+  try {
+    const localExtraction = await extractTextLocally(fileBuffer, mimeType);
+    if (localExtraction && isHighQualityLocalExtraction(localExtraction)) {
+      return localExtraction;
+    }
+  } catch {
+    // Fallback to Gemini OCR/extraction path for resilience.
+  }
+
+  return extractTextFromFileWithGemini(fileBuffer, mimeType);
 }
 
 const translate = new Translate();

@@ -147,6 +147,7 @@ import { motion } from "framer-motion";
 import { CheckCircle, AlertTriangle, Lightbulb, FileText } from "lucide-react";
 import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
+import type { ClauseCitation, DeterministicRiskFinding } from "../../types";
 
 type CitizenSummaryProps = {
   title: string; // e.g. "Marriage Agreement Summary"
@@ -163,9 +164,31 @@ type CitizenSummaryProps = {
   };
   suggestions: string[];
   analogy: string;
+  benefitCitations?: Array<{ insight: string; citations: ClauseCitation[] }>;
+  riskCitations?: Array<{ insight: string; citations: ClauseCitation[] }>;
+  suggestionCitations?: Array<{ insight: string; citations: ClauseCitation[] }>;
+  deterministicRiskFindings?: DeterministicRiskFinding[];
+};
+
+const getSeverityBadgeClasses = (severity: DeterministicRiskFinding["severity"]) => {
+  if (severity === "high") return "bg-red-100 text-red-700 border-red-200";
+  if (severity === "medium") return "bg-amber-100 text-amber-700 border-amber-200";
+  return "bg-emerald-100 text-emerald-700 border-emerald-200";
+};
+
+const getCitationsForInsight = (
+  insights: Array<{ insight: string; citations: ClauseCitation[] }> | undefined,
+  insight: string,
+): ClauseCitation[] => {
+  const match = insights?.find((item) => item.insight === insight);
+  return Array.isArray(match?.citations) ? match!.citations : [];
 };
 
 export default function CitizenSummary({ aiRawOutput }: { aiRawOutput: CitizenSummaryProps }) {
+  const deterministicFindings = Array.isArray(aiRawOutput.deterministicRiskFindings)
+    ? aiRawOutput.deterministicRiskFindings
+    : [];
+
   return (
     <motion.div
       className="border rounded-2xl max-w-6xl mx-auto shadow-sm bg-white p-6 space-y-8 text-gray-800"
@@ -197,7 +220,18 @@ export default function CitizenSummary({ aiRawOutput }: { aiRawOutput: CitizenSu
           {aiRawOutput.benefits && aiRawOutput.benefits.length > 0 ? (
             <ul className="list-disc ml-6 space-y-1 text-gray-700">
               {aiRawOutput.benefits.map((b, i) => (
-                <li key={i}>{b}</li>
+                <li key={i}>
+                  <p>{b}</p>
+                  {getCitationsForInsight(aiRawOutput.benefitCitations, b).length > 0 && (
+                    <ul className="mt-1 ml-4 space-y-1 text-xs text-slate-600 list-disc">
+                      {getCitationsForInsight(aiRawOutput.benefitCitations, b).map((citation, citationIndex) => (
+                        <li key={`${citation.location}-${citationIndex}`}>
+                          <span className="font-semibold">{citation.location}:</span> "{citation.quote}"
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
               ))}
             </ul>
           ) : (
@@ -213,7 +247,18 @@ export default function CitizenSummary({ aiRawOutput }: { aiRawOutput: CitizenSu
           {aiRawOutput.risks && aiRawOutput.risks.length > 0 ? (
             <ul className="list-disc ml-6 space-y-1 text-gray-700">
               {aiRawOutput.risks.map((r, i) => (
-                <li key={i}>{r}</li>
+                <li key={i}>
+                  <p>{r}</p>
+                  {getCitationsForInsight(aiRawOutput.riskCitations, r).length > 0 && (
+                    <ul className="mt-1 ml-4 space-y-1 text-xs text-slate-600 list-disc">
+                      {getCitationsForInsight(aiRawOutput.riskCitations, r).map((citation, citationIndex) => (
+                        <li key={`${citation.location}-${citationIndex}`}>
+                          <span className="font-semibold">{citation.location}:</span> "{citation.quote}"
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
               ))}
             </ul>
           ) : (
@@ -283,13 +328,54 @@ export default function CitizenSummary({ aiRawOutput }: { aiRawOutput: CitizenSu
         {aiRawOutput.suggestions && aiRawOutput.suggestions.length > 0 ? (
           <ul className="list-disc ml-6 space-y-1 text-gray-700">
             {aiRawOutput.suggestions.map((s, i) => (
-              <li key={i}>{s}</li>
+              <li key={i}>
+                <p>{s}</p>
+                {getCitationsForInsight(aiRawOutput.suggestionCitations, s).length > 0 && (
+                  <ul className="mt-1 ml-4 space-y-1 text-xs text-slate-600 list-disc">
+                    {getCitationsForInsight(aiRawOutput.suggestionCitations, s).map((citation, citationIndex) => (
+                      <li key={`${citation.location}-${citationIndex}`}>
+                        <span className="font-semibold">{citation.location}:</span> "{citation.quote}"
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
             ))}
           </ul>
         ) : (
           <div className="ml-6 text-gray-500">N/A</div>
         )}
       </section>
+
+      {deterministicFindings.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold text-gray-800 mb-3">Deterministic Risk Checks</h2>
+          <div className="space-y-4">
+            {deterministicFindings.map((finding) => (
+              <div key={finding.ruleId} className="rounded-xl border border-gray-200 p-4 bg-white shadow-sm">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <p className="text-base font-semibold text-gray-800">{finding.title}</p>
+                  <span className={`text-xs font-semibold uppercase px-2 py-1 rounded-full border ${getSeverityBadgeClasses(finding.severity)}`}>
+                    {finding.severity}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-700 mb-2">{finding.issue}</p>
+                <p className="text-sm text-blue-700 mb-3">
+                  <strong>Recommendation:</strong> {finding.recommendation}
+                </p>
+                <ul className="space-y-2">
+                  {finding.citations.map((citation, index) => (
+                    <li key={`${finding.ruleId}-${citation.location}-${index}`} className="text-sm text-slate-700">
+                      <p className="text-xs text-slate-500 mb-1">{citation.location}</p>
+                      <p>"{citation.quote}"</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Analogy */}
       <section className="bg-gray-50 border-l-4 border-blue-400 p-4 rounded-md">
