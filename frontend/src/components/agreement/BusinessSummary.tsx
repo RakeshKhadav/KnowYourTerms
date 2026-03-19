@@ -113,6 +113,23 @@ function isNewAssessment(obj: any): obj is { overallScore: number; recommendatio
 }
 import { ShieldAlert, Lightbulb, CheckCircle2 } from "lucide-react";
 
+const renderBoldMarkdown = (text: string) => {
+  return text
+    .split(/(\*\*[^*]+\*\*|\*[^*\n]+\*)/g)
+    .filter(Boolean)
+    .map((part, index) => {
+      const isDoubleAsteriskBold = part.startsWith("**") && part.endsWith("**");
+      const isSingleAsteriskBold = part.startsWith("*") && part.endsWith("*");
+
+      if (isDoubleAsteriskBold || isSingleAsteriskBold) {
+        const trimLength = isDoubleAsteriskBold ? 2 : 1;
+        return <strong key={`${part}-${index}`}>{part.slice(trimLength, -trimLength)}</strong>;
+      }
+
+      return <span key={`${part}-${index}`}>{part}</span>;
+    });
+};
+
 const CircularScore: React.FC<{ score: number }> = ({ score }) => {
   // Score is out of 10, convert to percent
   const percent = Math.round((score / 10) * 100);
@@ -171,10 +188,10 @@ const BusinessSummary: React.FC<{ aiRawOutput: ImportedBusinessOutput }> = ({ ai
       <div className="sticky top-0 z-10 bg-white pb-2 border-b border-gray-200">
         <h2 className="text-3xl font-bold text-gray-900 px-8 pt-6 pb-4 w-full">{summaryTitle}</h2>
       </div>
-      <div className="flex flex-col md:flex-row gap-0">
-        {/* Left: Scrollable Content */}
-        <div className="md:w-3/4 w-full">
-          <div className="bg-white rounded-2xl p-8 space-y-10 max-h-[600px] overflow-y-auto">
+      <div className="flex flex-col lg:flex-row items-start gap-6">
+        {/* Left: Main Content */}
+        <div className="w-full lg:w-3/4 lg:min-w-0">
+          <div className="bg-white rounded-2xl p-8 space-y-10">
             {/* About */}
             <div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">About</h3>
@@ -256,8 +273,8 @@ const BusinessSummary: React.FC<{ aiRawOutput: ImportedBusinessOutput }> = ({ ai
         </div>
 
         {/* Right: Score & Recommendations */}
-        <div className="md:w-1/4 w-full flex-shrink-0">
-          <div className="bg-white shadow rounded-2xl py-6 px-4 flex flex-col items-center mb-6 sticky top-28" style={{ minHeight: 340 }}>
+        <div className="w-full lg:w-1/4 lg:min-w-[280px] flex-shrink-0">
+          <div className="bg-white shadow rounded-2xl py-6 px-4 flex flex-col items-center sticky top-28">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Overall Score</h3>
             {isNew ? (
               <CircularScore score={assessment.overallScore} />
@@ -266,10 +283,12 @@ const BusinessSummary: React.FC<{ aiRawOutput: ImportedBusinessOutput }> = ({ ai
             )}
             <div className="mt-6 w-full">
               <h4 className="text-base font-semibold text-gray-800 mb-2">Recommendations</h4>
-              <ul className="list-disc pl-5 text-gray-700 text-sm space-y-1">
+              <ul className="list-disc pl-5 text-gray-700 text-sm space-y-2">
                 {isNew && assessment.recommendations.length > 0
                   ? assessment.recommendations.map((rec: string, i: number) => (
-                      <li key={i}>{rec}</li>
+                      <li key={i} className="leading-relaxed">
+                        {renderBoldMarkdown(rec)}
+                      </li>
                     ))
                   : <li className="text-gray-400">No recommendations available</li>
                 }

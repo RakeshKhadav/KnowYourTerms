@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Upload, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 import CitizenSummary from "../../../components/agreement/CitizenSummary";
 import BusinessSummary from "../../../components/agreement/BusinessSummary";
 import StudentSummary from "../../../components/agreement/StudentSummary";
@@ -59,7 +58,6 @@ type SummaryUnion =
 
 export default function SummaryPage({ targetGroup }: Props) {
     const dispatch = useAppDispatch();
-    const navigate = useNavigate();
     const [file, setFile] = useState<File | null>(null);
     const [summary, setSummary] = useState<SummaryUnion | null>(null);
     const [loading, setLoading] = useState(false);
@@ -120,30 +118,6 @@ export default function SummaryPage({ targetGroup }: Props) {
             setShowUpload(true);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleAskWithAgent = async () => {
-        if (!summary) return;
-        
-        try {
-            // Create a formatted summary text for the agent
-            let summaryText = "";
-            
-            if (summary.type === "citizen") {
-                summaryText = `Document Analysis Summary:\nAbout: ${summary.about}\nBenefits: ${summary.benefits.join(", ")}\nRisks: ${summary.risks.join(", ")}\nSuggestions: ${summary.suggestions.join(", ")}`;
-            } else if (summary.type === "student") {
-                summaryText = `Document Analysis Summary:\nAbout: ${summary.about}\nKey Legal Notes: ${summary.keyLegalNotes.join(", ")}\nFinal Tips: ${summary.finalTips.join(", ")}`;
-            } else if (summary.type === "business_owner") {
-                const clausesSummary = summary.clauses.map(clause => `${clause.title}: ${clause.explanation}`).join("; ");
-                summaryText = `Document Analysis Summary:\nAbout: ${summary.about}\nKey Clauses: ${clausesSummary}\nCompliance Notes: ${summary.keyComplianceNotes.join(", ")}\nRisk Assessment: ${summary.finalAssessment.overallRisk}`;
-            }
-            
-            // Navigate to agent chat with summary data
-            navigate(`/agent/chat?summary=${encodeURIComponent(summaryText)}`);
-        } catch (error) {
-            console.error('Error navigating to agent:', error);
-            toast.error('Failed to open agent chat. Please try again.');
         }
     };
 
@@ -309,14 +283,6 @@ export default function SummaryPage({ targetGroup }: Props) {
                         className="border px-4 py-2 rounded-lg shadow hover:bg-gray-100 transition-colors"
                     >
                         Share
-                    </button>
-
-                    {/* Pass summary data to agent */}
-                    <button
-                        onClick={handleAskWithAgent}
-                        className="border px-4 py-2 rounded-lg shadow hover:bg-gray-100 transition-colors"
-                    >
-                        {t('summaryPage.actions.ask_agent')}
                     </button>
                 </div>
             )}

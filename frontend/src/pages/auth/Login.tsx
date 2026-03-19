@@ -8,6 +8,11 @@ import { loginAsync } from "../../store/authSlice";
 import { useAppDispatch } from "../../hooks/redux";
 import loginSvg from "../../assets/login.svg";
 
+const RECRUITER_CREDENTIALS = {
+  email: "test@gmail.com",
+  password: "test1234",
+};
+
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -42,6 +47,11 @@ const Login: React.FC = () => {
       setErrors({ general: error || "Login failed. Please try again." });
       toast.error(error || "Login failed. Please try again.");
     }
+  };
+
+  const handleUseRecruiterCredentials = () => {
+    setFormData(RECRUITER_CREDENTIALS);
+    setErrors({});
   };
 
   return (
@@ -82,6 +92,19 @@ const Login: React.FC = () => {
                 placeholder="Enter your password"
                 required
               />
+            </div>
+
+            <div className="rounded-lg border border-[#e6e1d5] bg-[#fff8eb] px-4 py-3 text-sm text-[#5c4a1f]">
+              <p className="font-semibold">Recruiter Login (Demo)</p>
+              <p>Email: {RECRUITER_CREDENTIALS.email}</p>
+              <p>Password: {RECRUITER_CREDENTIALS.password}</p>
+              <button
+                type="button"
+                onClick={handleUseRecruiterCredentials}
+                className="mt-2 text-[#1a237e] font-semibold hover:underline"
+              >
+                Use these credentials
+              </button>
             </div>
 
             {errors.general && <p className="text-sm text-orange-600">{errors.general}</p>}
