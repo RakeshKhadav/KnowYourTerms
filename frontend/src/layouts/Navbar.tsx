@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import i18n from "../utils/i18n";
 import { useTranslation } from "react-i18next";
@@ -41,14 +41,14 @@ const Navbar = () => {
     >
       {/* Logo */}
       <div className="flex items-center">
-        <a href="/">
+        <Link to="/">
           <img
             className="h-10 w-auto object-cover cursor-pointer"
             src="/logo.png"
             alt="Know Your Term logo"
             loading="lazy"
           />
-        </a>
+        </Link>
       </div>
 
       {/* Hamburger for small screens */}
@@ -114,7 +114,7 @@ const Navbar = () => {
           />
         </div>
 
-        <a href="/about" className="text-base font-semibold hover:text-[#CDA047] transition">{t("header.about")}</a>
+        <Link to="/about" className="text-base font-semibold hover:text-[#CDA047] transition">{t("header.about")}</Link>
         {/* Solutions with Flicker-Free Dropdown & Animation */}
         <div
           className="relative"
@@ -145,9 +145,9 @@ const Navbar = () => {
                 {/* Solutions List */}
                 <div className="flex-1 grid grid-cols-2 gap-6">
                   {SolutionsDropdown.map((item, idx) => (
-                    <a
+                    <Link
                       key={idx}
-                      href={item.href}
+                      to={item.href}
                       className="flex items-start gap-3 mb-2 cursor-pointer hover:bg-gradient-to-br hover:from-[#e5e7eb] hover:via-[#f3f4f6] hover:to-[#f9fafb] group-hover:text-[#CDA047] hover:text-[#CDA047] p-3 rounded-lg transition group"
                     >
                       <span className="text-xl group-hover:scale-110 transition">{item.icon}</span>
@@ -155,14 +155,14 @@ const Navbar = () => {
                         <div className="font-semibold text-gray-900 ">{t(item.titleKey)}</div>
                         <div className="text-gray-500 text-sm ">{t(item.descKey)}</div>
                       </div>
-                    </a>
+                    </Link>
                   ))}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-        {isAuthenticated && <a href="/dashboard" className="text-base font-semibold hover:text-[#CDA047] transition">{t("header.dashboard")}</a>}
+        {isAuthenticated && <Link to="/dashboard" className="text-base font-semibold hover:text-[#CDA047] transition">{t("header.dashboard")}</Link>}
       </nav>
 
       <div className="hidden sm:block">
